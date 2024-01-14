@@ -3835,49 +3835,57 @@ bool Game::combatChangeHealth(Creature* attacker, Creature* target, CombatDamage
 		target->gainHealth(attacker, damage.primary.value);
 		realHealthChange = target->getHealth() - realHealthChange;
 
-		if (realHealthChange > 0 && !target->isInGhostMode()) {
-			auto damageString = fmt::format("{:d} hitpoint{:s}", realHealthChange, realHealthChange != 1 ? "s" : "");
+	if (realHealthChange > 0 && !target->isInGhostMode()) {
+		auto damageString = fmt::format("{:d} hitpoint{:s}", realHealthChange, realHealthChange != 1 ? "s" : "");
 
-			std::string spectatorMessage;
+		std::string spectatorMessage;
 
-			TextMessage message;
-			std::ostringstream strHealthChange;
-			strHealthChange << realHealthChange;
-			addAnimatedText(strHealthChange.str(), targetPos, TEXTCOLOR_MAYABLUE);
+		TextMessage message;
+		message.position = targetPos;
+		message.primary.value = realHealthChange;
+		message.primary.color = TEXTCOLOR_DARKRED;
 
-			SpectatorVec spectators;
-			map.getSpectators(spectators, targetPos, false, true);
-			for (Creature* spectator : spectators) {
-				Player* tmpPlayer = spectator->getPlayer();
-				if (tmpPlayer == attackerPlayer && attackerPlayer != targetPlayer) {
-					message.type = MESSAGE_STATUS_DEFAULT;
-					message.text = fmt::format("You heal {:s} for {:s}.", target->getNameDescription(), damageString);
-				} else if (tmpPlayer == targetPlayer) {
-					message.type = MESSAGE_STATUS_DEFAULT;
-					if (!attacker) {
-						message.text = fmt::format("You were healed for {:s}.", damageString);
-					} else if (targetPlayer == attackerPlayer) {
-						message.text = fmt::format("You healed yourself for {:s}.", damageString);
-					} else {
-						message.text = fmt::format("You were healed by {:s} for {:s}.", attacker->getNameDescription(), damageString);
-					}
+		SpectatorVec spectators;
+		map.getSpectators(spectators, targetPos, false, true);
+		for (Creature* spectator : spectators) {
+			assert(dynamic_cast<Player*>(spectator) != nullptr);
+
+			Player* spectatorPlayer = static_cast<Player*>(spectator);
+			if (spectatorPlayer == attackerPlayer && attackerPlayer != targetPlayer) {
+				message.type = MESSAGE_STATUS_DEFAULT;
+				message.text = fmt::format("You heal {:s} for {:s}.", target->getNameDescription(), damageString);
+			} else if (spectatorPlayer == targetPlayer) {
+				message.type = MESSAGE_STATUS_DEFAULT;
+				if (!attacker) {
+					message.text = fmt::format("You were healed for {:s}.", damageString);
+				} else if (targetPlayer == attackerPlayer) {
+					message.text = fmt::format("You healed yourself for {:s}.", damageString);
 				} else {
-					message.type = MESSAGE_STATUS_DEFAULT;
-					if (spectatorMessage.empty()) {
-						if (!attacker) {
-							spectatorMessage = fmt::format("{:s} was healed for {:s}.", target->getNameDescription(), damageString);
-						} else if (attacker == target) {
-							spectatorMessage = fmt::format("{:s} healed {:s}self for {:s}.", attacker->getNameDescription(), targetPlayer ? (targetPlayer->getSex() == PLAYERSEX_FEMALE ? "her" : "him") : "it", damageString);
-						} else {
-							spectatorMessage = fmt::format("{:s} healed {:s} for {:s}.", attacker->getNameDescription(), target->getNameDescription(), damageString);
-						}
-						spectatorMessage[0] = std::toupper(spectatorMessage[0]);
-					}
-					message.type = MESSAGE_STATUS_DEFAULT;
+					message.text = fmt::format("You were healed by {:s} for {:s}.", attacker->getNameDescription(),
+						damageString);
 				}
-				tmpPlayer->sendTextMessage(message);
+			} else {
+				message.type = MESSAGE_STATUS_DEFAULT;
+				if (spectatorMessage.empty()) {
+					if (!attacker) {
+						spectatorMessage =
+						fmt::format("{:s} was healed for {:s}.", target->getNameDescription(), damageString);
+					} else if (attacker == target) {
+						spectatorMessage = fmt::format(
+							"{:s} healed {:s}self for {:s}.", attacker->getNameDescription(),
+							targetPlayer ? (targetPlayer->getSex() == PLAYERSEX_FEMALE ? "her" : "him") : "it",
+							damageString);
+					} else {
+						spectatorMessage = fmt::format("{:s} healed {:s} for {:s}.", attacker->getNameDescription(),
+							target->getNameDescription(), damageString);
+					}
+					spectatorMessage[0] = std::toupper(spectatorMessage[0]);
+				}
+				message.text = spectatorMessage;
 			}
+			spectatorPlayer->sendTextMessage(message);
 		}
+	}
 	} else {
 		if (!target->isAttackable()) {
 			if (!target->isInGhostMode()) {
